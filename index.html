@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>團體數獨桌遊生成器 · 認知訓練教案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    /* 數字模式（預設）— 靛藍書卷風 */
+    --c-bg: #F4F6FB;
+    --c-surface: #FFFFFF;
+    --c-surface-2: #EEF1F9;
+    --c-ink: #1C2333;
+    --c-ink-soft: #5A6478;
+    --c-line: #DDE2EF;
+    --c-primary: #3E5C9A;
+    --c-primary-soft: #DEE6F7;
+    --c-primary-deep: #25396B;
+    --c-accent: #C18A3D;
+    --c-success: #4F9D7A;
+    --shadow-sm: 0 1px 2px rgba(28, 35, 51, 0.06), 0 2px 4px rgba(28, 35, 51, 0.04);
+    --shadow-md: 0 4px 12px rgba(28, 35, 51, 0.08), 0 2px 4px rgba(28, 35, 51, 0.04);
+    --shadow-lg: 0 12px 32px rgba(28, 35, 51, 0.14);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --font-sans: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
+    --font-serif: 'Noto Serif TC', 'PingFang TC', '微軟正黑體', serif;
+  }
+  [data-symbol="icon"] {
+    /* 圖案模式 — 暖橙陶土風 */
+    --c-primary: #C26B3C;
+    --c-primary-soft: #FBE6D6;
+    --c-primary-deep: #8F451E;
+    --c-surface-2: #FBF1E9;
+    --c-accent: #4F8C8C;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  button, .toggle, .mode-btn, .seg button, .icon-btn, .btn, input[type="range"] { touch-action: manipulation; }
+  html, body {
+    background: var(--c-bg);
+    color: var(--c-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+  button { font-family: inherit; }
+  input[type="text"], input[type="number"] { font-size: 16px; }
+  button:focus-visible, input:focus-visible, .toggle:focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+  }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(62, 92, 154, 0.07), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(193, 138, 61, 0.07), transparent 60%),
+      var(--c-bg);
+    padding-bottom: 120px;
+  }
+
+  /* ───── Header ───── */
+  .hdr { padding: 18px 18px 8px; text-align: center; position: relative; }
+  .hdr .badge {
+    display: inline-block; font-size: 11px; letter-spacing: 0.18em;
+    color: var(--c-primary-deep); background: var(--c-primary-soft);
+    padding: 4px 12px; border-radius: 999px; font-weight: 700;
+    margin-bottom: 8px; transition: all .25s ease;
+  }
+  .hdr h1 {
+    font-family: var(--font-serif); font-weight: 900;
+    font-size: clamp(22px, 5.4vw, 30px); letter-spacing: 0.02em; line-height: 1.2;
+    display: flex; justify-content: center; align-items: center; gap: 10px;
+  }
+  .hdr h1 .ico { font-size: 0.85em; transform: translateY(-1px); }
+  .hdr p.sub { color: var(--c-ink-soft); font-size: 13px; margin-top: 6px; }
+
+  .container { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+
+  /* ───── Symbol tabs ───── */
+  .modes {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    background: var(--c-surface); padding: 6px; border-radius: 999px;
+    margin: 14px auto 16px; max-width: 460px;
+    box-shadow: var(--shadow-sm); border: 1px solid var(--c-line);
+  }
+  .mode-btn {
+    background: transparent; border: 0; padding: 11px 10px; border-radius: 999px;
+    font-family: inherit; font-weight: 700; font-size: 14px; color: var(--c-ink-soft);
+    cursor: pointer; transition: all .25s ease;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .mode-btn[aria-pressed="true"] {
+    background: var(--c-primary); color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.12);
+  }
+
+  /* ───── Layout ───── */
+  .layout { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 960px) {
+    .layout {
+      grid-template-columns: 340px 1fr;
+      grid-template-areas: "settings preview" "output preview";
+      align-items: start;
+    }
+    .settings-game { grid-area: settings; }
+    .settings-output { grid-area: output; }
+    .preview-wrap { grid-area: preview; position: sticky; top: 16px; }
+  }
+
+  /* ───── Card ───── */
+  .card {
+    background: var(--c-surface); border: 1px solid var(--c-line);
+    border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm);
+  }
+  .card h2 {
+    font-size: 13px; font-weight: 800; letter-spacing: 0.18em;
+    color: var(--c-primary-deep); text-transform: uppercase;
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2::before {
+    content: ''; display: inline-block; width: 14px; height: 2px;
+    background: var(--c-primary); border-radius: 2px;
+  }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; font-weight: 600; color: var(--c-ink); margin-bottom: 6px;
+  }
+  .field label .v {
+    font-family: var(--font-serif); font-weight: 900; color: var(--c-primary-deep);
+    background: var(--c-primary-soft); padding: 1px 9px; border-radius: 999px; font-size: 13px;
+  }
+  input[type="range"] {
+    width: 100%; appearance: none; -webkit-appearance: none;
+    height: 30px; background: transparent; outline: 0; margin: 0; padding: 0;
+    touch-action: manipulation;
+  }
+  input[type="range"]::-webkit-slider-runnable-track { height: 6px; background: var(--c-line); border-radius: 999px; }
+  input[type="range"]::-moz-range-track { height: 6px; background: var(--c-line); border-radius: 999px; border: 0; }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none; width: 26px; height: 26px;
+    background: var(--c-primary); border: 3px solid #fff; border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0,0,0,.18); cursor: pointer; margin-top: -10px;
+    transition: transform .15s ease;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover, input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.12); }
+  input[type="range"]::-moz-range-thumb {
+    width: 26px; height: 26px; background: var(--c-primary); border: 3px solid #fff;
+    border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,.18); cursor: pointer;
+  }
+  .seg { display: grid; gap: 6px; grid-template-columns: repeat(4, 1fr); }
+  .seg button {
+    border: 1px solid var(--c-line); background: var(--c-surface);
+    padding: 11px 4px; min-height: 44px; border-radius: var(--radius-sm);
+    font-family: inherit; font-weight: 700; font-size: 12px; color: var(--c-ink-soft);
+    cursor: pointer; transition: all .2s ease; touch-action: manipulation;
+  }
+  .seg button:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+  .seg button[aria-pressed="true"] {
+    background: var(--c-primary); color: #fff; border-color: var(--c-primary);
+    box-shadow: 0 2px 6px rgba(0,0,0,.1);
+  }
+  .seg.size button { font-size: 11px; line-height: 1.25; padding: 9px 2px; }
+  .seg.three { grid-template-columns: repeat(3, 1fr); }
+
+  .num-row { display: flex; align-items: center; gap: 8px; }
+  .num-row input {
+    flex: 1; border: 1px solid var(--c-line); background: var(--c-surface);
+    padding: 11px 12px; border-radius: var(--radius-sm); font-family: var(--font-sans);
+    font-size: 14px; color: var(--c-ink); outline: 0; min-height: 44px;
+  }
+  .num-row input:focus { border-color: var(--c-primary); box-shadow: 0 0 0 3px var(--c-primary-soft); }
+  .icon-btn {
+    border: 1px solid var(--c-line); background: var(--c-surface);
+    width: 44px; height: 44px; flex-shrink: 0; border-radius: var(--radius-sm);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--c-primary-deep); transition: all .2s ease;
+    touch-action: manipulation;
+  }
+  .icon-btn:hover { background: var(--c-primary-soft); border-color: var(--c-primary); }
+  .icon-btn:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+  .icon-btn:active { transform: scale(0.92); }
+  @keyframes diceSpin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  .icon-btn.rolling { animation: diceSpin .5s cubic-bezier(.4,0,.2,1); }
+
+  .toggle {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 12px 14px; min-height: 48px; border: 1px solid var(--c-line);
+    border-radius: var(--radius-sm); background: var(--c-surface-2); cursor: pointer;
+    user-select: none; font-size: 13px; font-weight: 600; line-height: 1.35;
+    touch-action: manipulation; transition: background .15s ease;
+  }
+  .toggle:hover { background: var(--c-primary-soft); }
+  .toggle:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+  .toggle > span:first-child { flex: 1; min-width: 0; }
+  .switch {
+    width: 42px; height: 24px; background: var(--c-line); border-radius: 999px;
+    position: relative; transition: background .2s ease; flex-shrink: 0;
+  }
+  .switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+    background: #fff; border-radius: 50%; transition: transform .2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  .toggle.on .switch { background: var(--c-primary); }
+  .toggle.on .switch::after { transform: translateX(18px); }
+  .mode-btn:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+
+  /* ───── Preview ───── */
+  .preview-wrap {
+    background: var(--c-surface); border: 1px solid var(--c-line);
+    border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm);
+  }
+  .preview-head {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+  }
+  .preview-head .title { font-family: var(--font-serif); font-weight: 900; font-size: 16px; color: var(--c-ink); }
+  .preview-head .meta { font-size: 12px; color: var(--c-ink-soft); background: var(--c-surface-2); padding: 4px 10px; border-radius: 999px; }
+  .canvas-frame {
+    background:
+      linear-gradient(135deg, #fafafa 25%, transparent 25%) -10px 0 / 20px 20px,
+      linear-gradient(225deg, #fafafa 25%, transparent 25%) -10px 0 / 20px 20px,
+      linear-gradient(315deg, #fafafa 25%, transparent 25%) 0px 0 / 20px 20px,
+      linear-gradient(45deg, #fafafa 25%, transparent 25%) 0px 0 / 20px 20px,
+      #eef0f4;
+    border-radius: var(--radius-sm); padding: 8px;
+  }
+  #previewCanvas {
+    display: block; width: 100%; height: auto; max-width: 720px; margin: 0 auto;
+    background: #fff; box-shadow: var(--shadow-md); border-radius: 4px;
+    image-rendering: -webkit-optimize-contrast;
+  }
+  .page-nav {
+    display: flex; justify-content: center; align-items: center; gap: 12px;
+    margin-top: 12px; font-size: 13px; color: var(--c-ink-soft);
+  }
+  .page-nav button {
+    background: var(--c-surface); border: 1px solid var(--c-line); border-radius: 999px;
+    width: 44px; height: 44px; font-size: 18px; cursor: pointer; color: var(--c-primary-deep);
+    transition: all .2s ease; touch-action: manipulation;
+  }
+  .page-nav button:disabled { opacity: .3; cursor: not-allowed; }
+  .page-nav button:not(:disabled):hover { background: var(--c-primary-soft); border-color: var(--c-primary); }
+  .page-nav button:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
+
+  /* ───── Action bar ───── */
+  .action-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--c-line);
+    z-index: 10; display: flex; gap: 10px; max-width: 1180px; margin: 0 auto;
+  }
+  @media (min-width: 960px) {
+    .action-bar {
+      position: sticky; bottom: 16px; max-width: 100%; border-radius: 999px;
+      border: 1px solid var(--c-line); box-shadow: var(--shadow-lg); margin-top: 16px;
+    }
+    body { padding-bottom: 32px; }
+  }
+  .btn {
+    flex: 1; border: 0; padding: 14px 16px; border-radius: 999px;
+    font-family: inherit; font-weight: 800; font-size: 15px; cursor: pointer;
+    transition: all .2s ease; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-primary { background: var(--c-primary); color: #fff; box-shadow: 0 4px 14px rgba(62, 92, 154, 0.35); }
+  [data-symbol="icon"] .btn-primary { box-shadow: 0 4px 14px rgba(194, 107, 60, 0.35); }
+  .btn-primary:hover { filter: brightness(1.05); }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-secondary { background: var(--c-surface-2); color: var(--c-primary-deep); border: 1px solid var(--c-line); }
+  .btn:disabled { opacity: .6; cursor: progress; }
+
+  /* ───── Footer ───── */
+  footer { text-align: center; padding: 24px 16px 12px; color: var(--c-ink-soft); font-size: 12px; line-height: 1.6; }
+  footer .sig {
+    display: inline-block; font-family: var(--font-serif); font-weight: 700;
+    color: var(--c-primary-deep); padding: 4px 14px;
+    border-top: 1px solid var(--c-line); border-bottom: 1px solid var(--c-line); letter-spacing: 0.05em;
+  }
+
+  /* ───── Toast ───── */
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-200%);
+    background: var(--c-ink); color: #fff; padding: 10px 18px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg); z-index: 100;
+    transition: transform .3s cubic-bezier(.2,.8,.2,1); pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .hdr .deco { position: absolute; pointer-events: none; opacity: .3; }
+  .hdr .deco.l { left: 4%; top: 8px; font-size: 22px; transform: rotate(-12deg); }
+  .hdr .deco.r { right: 4%; top: 12px; font-size: 22px; transform: rotate(12deg); }
+  @media (max-width: 480px) { .hdr .deco { display: none; } }
+</style>
+</head>
+<body data-symbol="num">
+
+<header class="hdr">
+  <span class="deco l">🔢</span>
+  <span class="deco r">🧩</span>
+  <span class="badge" id="modeBadge">數 字 模 式</span>
+  <h1><span class="ico">🧩</span>團體數獨桌遊生成器<span class="ico">🔢</span></h1>
+  <p class="sub">邏輯推理・專注觀察・分區合作・搶答競賽　團體認知訓練教案</p>
+</header>
+
+<div class="container">
+  <div class="modes" role="tablist">
+    <button class="mode-btn" id="symNum"  role="tab" aria-pressed="true">🔢 數字模式</button>
+    <button class="mode-btn" id="symIcon" role="tab" aria-pressed="false">🧩 圖案模式</button>
+  </div>
+
+  <div class="layout">
+
+    <!-- 主要遊戲設定 -->
+    <aside class="card settings-game" id="settingsCard">
+      <h2>遊戲設定</h2>
+
+      <div class="field">
+        <label>盤面大小</label>
+        <div class="seg three" id="segBoard">
+          <button data-val="4" aria-pressed="false">4×4<br/>入門</button>
+          <button data-val="6" aria-pressed="true">6×6<br/>中等</button>
+          <button data-val="9" aria-pressed="false">9×9<br/>標準</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>難度</label>
+        <div class="seg" id="segDiff">
+          <button data-val="easy"      aria-pressed="true">簡單</button>
+          <button data-val="normal"    aria-pressed="false">普通</button>
+          <button data-val="hard"      aria-pressed="false">困難</button>
+          <button data-val="challenge" aria-pressed="false">挑戰</button>
+        </div>
+      </div>
+
+      <div class="field" id="fldIconSet" style="display:none">
+        <label>圖案主題</label>
+        <div class="seg three" id="segIconSet">
+          <button data-val="fruit"  aria-pressed="true">🍎 水果</button>
+          <button data-val="animal" aria-pressed="false">🐱 動物</button>
+          <button data-val="shape"  aria-pressed="false">⭐ 形狀</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>每頁題目數</label>
+        <div class="seg three" id="segPerPage">
+          <button data-val="1" aria-pressed="false">1 大題<br/>特大</button>
+          <button data-val="2" aria-pressed="true">2 題<br/>適中</button>
+          <button data-val="4" aria-pressed="false">4 題<br/>小</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 預覽 -->
+    <section class="preview-wrap">
+      <div class="preview-head">
+        <span class="title">預覽</span>
+        <span class="meta" id="metaInfo">—</span>
+      </div>
+      <div class="canvas-frame">
+        <canvas id="previewCanvas" width="827" height="1169" aria-label="題目預覽"></canvas>
+      </div>
+      <div class="page-nav">
+        <button id="prevPg" aria-label="上一頁">‹</button>
+        <span id="pgInfo">第 1 頁</span>
+        <button id="nextPg" aria-label="下一頁">›</button>
+      </div>
+    </section>
+
+    <!-- 輸出設定 -->
+    <aside class="card settings-output">
+      <h2>輸出設定</h2>
+
+      <div class="field">
+        <label>題目組數 <span class="v" id="vSets">6</span></label>
+        <input type="range" id="rngSets" min="1" max="20" step="1" value="6" />
+      </div>
+
+      <div class="field">
+        <label>隨機種子</label>
+        <div class="num-row">
+          <input type="text" id="seedInput" placeholder="輸入種子或留空隨機" autocomplete="off" />
+          <button class="icon-btn" id="seedReroll" title="重新隨機" aria-label="重新隨機種子">🎲</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="toggle on" id="togRules" role="switch" tabindex="0" aria-checked="true">
+          <span>📋 PDF 包含遊戲規則頁</span>
+          <span class="switch"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="toggle on" id="togAnswer" role="switch" tabindex="0" aria-checked="true">
+          <span>🔍 包含答案頁（完整解答）</span>
+          <span class="switch"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="toggle on" id="togCoop" role="switch" tabindex="0" aria-checked="true">
+          <span>👥 印分區合作色塊（分人填寫）</span>
+          <span class="switch"></span>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <div class="action-bar">
+    <button class="btn btn-secondary" id="btnReroll">🎲 重新生成</button>
+    <button class="btn btn-primary"   id="btnPDF">📄 匯出 PDF</button>
+  </div>
+</div>
+
+<footer>
+  <span class="sig">設計者：愛迪樂 鍾孟修 職能治療師</span>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════
+   團體數獨桌遊生成器
+   ════════════════════════════════════════════════════════ */
+
+/* ───── 種子隨機 (mulberry32) ───── */
+function strHash(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function mulberry32(seed) {
+  let t = seed >>> 0;
+  return function () {
+    t = (t + 0x6D2B79F5) >>> 0;
+    let x = t;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function shuffle(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ───── 盤面規格 ───── */
+const BOARD_SPEC = {
+  4: { n: 4, boxR: 2, boxC: 2 },  // 2×2 宮格
+  6: { n: 6, boxR: 2, boxC: 3 },  // 2 列 × 3 行 的 2×3 宮格
+  9: { n: 9, boxR: 3, boxC: 3 },  // 3×3 宮格
+};
+
+/* ───── 數獨求解 / 生成（保證唯一解） ───── */
+function makeEmpty(n) { return Array.from({ length: n }, () => new Array(n).fill(0)); }
+
+function isValid(grid, n, boxR, boxC, r, c, val) {
+  for (let i = 0; i < n; i++) {
+    if (grid[r][i] === val) return false;
+    if (grid[i][c] === val) return false;
+  }
+  const br = Math.floor(r / boxR) * boxR;
+  const bc = Math.floor(c / boxC) * boxC;
+  for (let i = 0; i < boxR; i++)
+    for (let j = 0; j < boxC; j++)
+      if (grid[br + i][bc + j] === val) return false;
+  return true;
+}
+
+// 用回溯法填滿（隨機順序）產生完整合法解
+function fillGrid(grid, spec, rng) {
+  const { n, boxR, boxC } = spec;
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (grid[r][c] === 0) {
+        const cand = shuffle(Array.from({ length: n }, (_, i) => i + 1), rng);
+        for (const v of cand) {
+          if (isValid(grid, n, boxR, boxC, r, c, v)) {
+            grid[r][c] = v;
+            if (fillGrid(grid, spec, rng)) return true;
+            grid[r][c] = 0;
+          }
+        }
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// 計算解的數量（最多到 limit 即停，用來驗證唯一性）
+function countSolutions(grid, spec, limit) {
+  const { n, boxR, boxC } = spec;
+  let count = 0;
+  function solve() {
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (grid[r][c] === 0) {
+          for (let v = 1; v <= n; v++) {
+            if (isValid(grid, n, boxR, boxC, r, c, v)) {
+              grid[r][c] = v;
+              solve();
+              grid[r][c] = 0;
+              if (count >= limit) return;
+            }
+          }
+          return;
+        }
+      }
+    }
+    count++;
+  }
+  solve();
+  return count;
+}
+
+// 依難度決定要保留的提示數量比例
+const DIFF_KEEP = {
+  // 保留的已知格比例（越低越難）
+  4:  { easy: 0.62, normal: 0.50, hard: 0.44, challenge: 0.38 },
+  6:  { easy: 0.58, normal: 0.47, hard: 0.39, challenge: 0.33 },
+  9:  { easy: 0.50, normal: 0.42, hard: 0.34, challenge: 0.28 },
+};
+
+function generatePuzzle(boardSize, difficulty, rng) {
+  const spec = BOARD_SPEC[boardSize];
+  const { n } = spec;
+  const solution = makeEmpty(n);
+  fillGrid(solution, spec, rng);
+
+  const puzzle = solution.map(row => row.slice());
+  const total = n * n;
+  const keepRatio = DIFF_KEEP[boardSize][difficulty];
+  const targetClues = Math.max(n + 1, Math.round(total * keepRatio));
+
+  // 隨機順序嘗試挖洞，挖洞後仍須保持唯一解
+  const cells = shuffle(Array.from({ length: total }, (_, i) => i), rng);
+  let clues = total;
+  for (const idx of cells) {
+    if (clues <= targetClues) break;
+    const r = Math.floor(idx / n), c = idx % n;
+    const backup = puzzle[r][c];
+    if (backup === 0) continue;
+    puzzle[r][c] = 0;
+    // 驗證唯一解
+    const test = puzzle.map(row => row.slice());
+    const sols = countSolutions(test, spec, 2);
+    if (sols !== 1) {
+      puzzle[r][c] = backup; // 還原，保持唯一解
+    } else {
+      clues--;
+    }
+  }
+
+  return { puzzle, solution, spec, clues };
+}
+
+/* ───── 圖案符號集 ───── */
+const ICON_SETS = {
+  fruit:  ['🍎','🍌','🍇','🍊','🍓','🥝','🍑','🍐','🍉'],
+  animal: ['🐱','🐶','🐰','🐼','🦊','🐸','🐷','🐯','🐵'],
+  shape:  ['●','▲','■','★','◆','♥','♣','♠','✚'],
+};
+const SHAPE_COLORS = ['#3E5C9A','#C26B3C','#4F9D7A','#9A3E6B','#C18A3D','#5A6478','#7A4F9A','#3E8C9A','#9A6B3E'];
+
+/* ───── 繪製單個數獨盤 ───── */
+function drawSudokuGrid(ctx, x, y, size, data, spec, opts) {
+  const { n, boxR, boxC } = spec;
+  const cell = size / n;
+  const symbolMode = opts.symbol;     // 'num' | 'icon'
+  const iconSet = opts.iconSet || 'fruit';
+  const showCoop = opts.showCoop;
+  const isSolution = opts.isSolution;
+
+  // 合作色塊背景（依宮格分區上色，方便分人負責）
+  if (showCoop && !isSolution) {
+    const coopColors = ['#E8EEFA','#FBF1E9','#E9F4EF','#F7EAF0','#FAF4E4','#EDEFF5'];
+    const boxesPerRow = n / boxC;
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        const boxIdx = Math.floor(r / boxR) * boxesPerRow + Math.floor(c / boxC);
+        ctx.fillStyle = coopColors[boxIdx % coopColors.length];
+        ctx.fillRect(x + c * cell, y + r * cell, cell, cell);
+      }
+    }
+  } else {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(x, y, size, size);
+  }
+
+  // 細格線
+  ctx.strokeStyle = '#B8C0D4';
+  ctx.lineWidth = Math.max(1, size / 380);
+  for (let i = 0; i <= n; i++) {
+    ctx.beginPath(); ctx.moveTo(x + i * cell, y); ctx.lineTo(x + i * cell, y + size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y + i * cell); ctx.lineTo(x + size, y + i * cell); ctx.stroke();
+  }
+
+  // 粗宮格線
+  ctx.strokeStyle = '#2B3654';
+  ctx.lineWidth = Math.max(2.4, size / 130);
+  // 垂直（每 boxC 條）
+  for (let i = 0; i <= n; i += boxC) {
+    ctx.beginPath(); ctx.moveTo(x + i * cell, y); ctx.lineTo(x + i * cell, y + size); ctx.stroke();
+  }
+  // 水平（每 boxR 條）
+  for (let i = 0; i <= n; i += boxR) {
+    ctx.beginPath(); ctx.moveTo(x, y + i * cell); ctx.lineTo(x + size, y + i * cell); ctx.stroke();
+  }
+  // 外框補強
+  ctx.strokeRect(x, y, size, size);
+
+  // 填入內容
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      const val = data[r][c];
+      if (val === 0) continue;
+      const cx = x + c * cell + cell / 2;
+      const cy = y + r * cell + cell / 2;
+
+      const isGiven = !isSolution && opts.puzzle && opts.puzzle[r][c] !== 0;
+      const isFilled = isSolution && opts.puzzle && opts.puzzle[r][c] === 0; // 解答中後填的格
+      const drawSolvedHint = isSolution && opts.puzzle && opts.puzzle[r][c] !== 0; // 原提示
+
+      if (symbolMode === 'num') {
+        ctx.font = `${isGiven || drawSolvedHint ? 900 : 700} ${cell * 0.56}px "Noto Serif TC", serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        if (isSolution) {
+          ctx.fillStyle = drawSolvedHint ? '#1C2333' : '#C26B3C'; // 後填的數字用橙色強調
+        } else {
+          ctx.fillStyle = '#1C2333';
+        }
+        ctx.fillText(String(val), cx, cy + cell * 0.02);
+      } else {
+        // 圖案模式
+        const set = ICON_SETS[iconSet];
+        const sym = set[val - 1];
+        if (iconSet === 'shape') {
+          ctx.fillStyle = isSolution && isFilled ? '#C26B3C' : SHAPE_COLORS[val - 1];
+          ctx.font = `900 ${cell * 0.5}px "Noto Sans TC", sans-serif`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(sym, cx, cy + cell * 0.02);
+        } else {
+          // emoji
+          ctx.font = `${cell * 0.52}px "Noto Sans TC", sans-serif`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(sym, cx, cy + cell * 0.02);
+          // 解答中後填的用底色圈強調
+          if (isSolution && isFilled) {
+            ctx.strokeStyle = '#C26B3C';
+            ctx.lineWidth = Math.max(1.6, cell / 24);
+            ctx.beginPath();
+            ctx.arc(cx, cy, cell * 0.42, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+  }
+}
+
+/* ───── 圖例（圖案模式對照表）───── */
+function drawLegend(ctx, x, y, w, n, iconSet, fontPx) {
+  const set = ICON_SETS[iconSet];
+  ctx.fillStyle = '#5A6478';
+  ctx.font = `500 ${fontPx}px "Noto Sans TC", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  let label = '對照：';
+  ctx.fillText(label, x, y);
+  let lx = x + ctx.measureText(label).width + fontPx * 0.4;
+  for (let i = 0; i < n; i++) {
+    const sym = set[i];
+    if (iconSet === 'shape') {
+      ctx.fillStyle = SHAPE_COLORS[i];
+      ctx.font = `900 ${fontPx}px "Noto Sans TC", sans-serif`;
+    } else {
+      ctx.font = `${fontPx}px "Noto Sans TC", sans-serif`;
+    }
+    ctx.fillText(sym, lx, y);
+    lx += fontPx * 1.05;
+    ctx.fillStyle = '#9AA3B8';
+    ctx.font = `500 ${fontPx * 0.8}px "Noto Sans TC", sans-serif`;
+    ctx.fillText('=' + (i + 1), lx, y);
+    lx += fontPx * 1.4;
+  }
+}
+
+/* ───── 排版常數 ───── */
+const A4 = { w: 827, h: 1169 };
+const A4_PRINT = { w: 1654, h: 2339 };
+
+/* ───── 題目頁 ───── */
+function drawPuzzlePage(ctx, pageWidth, pageHeight, puzzles, startIdx, perPage, opts) {
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, pageWidth, pageHeight);
+
+  const margin = pageWidth * 0.06;
+  // 頁眉
+  ctx.fillStyle = '#1C2333';
+  ctx.font = `700 ${pageWidth * 0.022}px "Noto Sans TC", sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(opts.title || '團體數獨', margin, margin * 0.45);
+  ctx.fillStyle = '#5A6478';
+  ctx.font = `400 ${pageWidth * 0.014}px "Noto Sans TC", sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(opts.subtitle || '', pageWidth - margin, margin * 0.55);
+
+  const contentY = margin + pageHeight * 0.04;
+  const contentH = pageHeight - contentY - margin * 1.2;
+  const contentW = pageWidth - margin * 2;
+
+  // 依 perPage 決定排列
+  let layout;
+  if (perPage === 1) layout = { cols: 1, rows: 1 };
+  else if (perPage === 2) layout = { cols: 1, rows: 2 };
+  else layout = { cols: 2, rows: 2 };
+
+  const cellW = contentW / layout.cols;
+  const cellH = contentH / layout.rows;
+
+  for (let i = 0; i < perPage; i++) {
+    const pz = puzzles[startIdx + i];
+    if (!pz) continue;
+    const col = i % layout.cols;
+    const row = Math.floor(i / layout.cols);
+    const slotX = margin + col * cellW;
+    const slotY = contentY + row * cellH;
+
+    // 題號
+    const titleH = cellH * 0.10;
+    ctx.fillStyle = opts.symbol === 'icon' ? '#8F451E' : '#25396B';
+    ctx.font = `900 ${Math.min(cellH * 0.07, cellW * 0.06)}px "Noto Serif TC", serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`第 ${startIdx + i + 1} 題　（${pz.spec.n}×${pz.spec.n}・提示 ${pz.clues} 格）`, slotX + cellW * 0.04, slotY);
+
+    // 計算數獨盤可用大小（正方形，置中）
+    const legendH = opts.symbol === 'icon' ? cellH * 0.06 : 0;
+    const availW = cellW * 0.92;
+    const availH = cellH - titleH - legendH - cellH * 0.04;
+    const gridSize = Math.min(availW, availH);
+    const gx = slotX + (cellW - gridSize) / 2;
+    const gy = slotY + titleH;
+
+    drawSudokuGrid(ctx, gx, gy, gridSize, pz.puzzle, pz.spec, {
+      symbol: opts.symbol,
+      iconSet: opts.iconSet,
+      showCoop: opts.showCoop,
+      isSolution: false,
+      puzzle: pz.puzzle,
+    });
+
+    // 圖案對照表
+    if (opts.symbol === 'icon') {
+      const fontPx = Math.min(gridSize * 0.045, cellH * 0.03);
+      drawLegend(ctx, gx, gy + gridSize + legendH * 0.5, gridSize, pz.spec.n, opts.iconSet, Math.max(11, fontPx));
+    }
+  }
+
+  // 頁尾
+  ctx.fillStyle = '#5A6478';
+  ctx.font = `400 ${pageWidth * 0.013}px "Noto Sans TC", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('設計者：愛迪樂 鍾孟修 職能治療師', margin, pageHeight - margin * 0.55);
+  ctx.textAlign = 'right';
+  ctx.fillText(opts.pageLabel || '', pageWidth - margin, pageHeight - margin * 0.55);
+}
+
+/* ───── 答案頁 ───── */
+function drawAnswerPage(ctx, pageWidth, pageHeight, puzzles, startIdx, perPage, opts) {
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, pageWidth, pageHeight);
+
+  const margin = pageWidth * 0.06;
+  ctx.fillStyle = opts.symbol === 'icon' ? '#8F451E' : '#25396B';
+  ctx.font = `900 ${pageWidth * 0.03}px "Noto Serif TC", serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText('🔍 完整解答頁', margin, margin * 0.4);
+  ctx.fillStyle = '#5A6478';
+  ctx.font = `400 ${pageWidth * 0.014}px "Noto Sans TC", sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(opts.subtitle || '', pageWidth - margin, margin * 0.5);
+
+  const contentY = margin + pageHeight * 0.04;
+  const contentH = pageHeight - contentY - margin * 1.2;
+  const contentW = pageWidth - margin * 2;
+
+  // 答案頁一頁多放幾題（4 或 6）
+  const ansPerPage = perPage === 1 ? 2 : 4;
+  let layout = ansPerPage === 2 ? { cols: 1, rows: 2 } : { cols: 2, rows: 2 };
+  const cellW = contentW / layout.cols;
+  const cellH = contentH / layout.rows;
+
+  for (let i = 0; i < ansPerPage; i++) {
+    const pz = puzzles[startIdx + i];
+    if (!pz) continue;
+    const col = i % layout.cols;
+    const row = Math.floor(i / layout.cols);
+    const slotX = margin + col * cellW;
+    const slotY = contentY + row * cellH;
+
+    const titleH = cellH * 0.10;
+    ctx.fillStyle = '#1C2333';
+    ctx.font = `700 ${Math.min(cellH * 0.06, cellW * 0.05)}px "Noto Serif TC", serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`第 ${startIdx + i + 1} 題　解答`, slotX + cellW * 0.04, slotY);
+
+    const availW = cellW * 0.90;
+    const availH = cellH - titleH - cellH * 0.04;
+    const gridSize = Math.min(availW, availH);
+    const gx = slotX + (cellW - gridSize) / 2;
+    const gy = slotY + titleH;
+
+    drawSudokuGrid(ctx, gx, gy, gridSize, pz.solution, pz.spec, {
+      symbol: opts.symbol,
+      iconSet: opts.iconSet,
+      showCoop: false,
+      isSolution: true,
+      puzzle: pz.puzzle,
+    });
+  }
+
+  ctx.fillStyle = '#9AA3B8';
+  ctx.font = `400 ${pageWidth * 0.013}px "Noto Sans TC", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('（橙色＝需填入的答案・黑色＝原始提示）　設計者：愛迪樂 鍾孟修 職能治療師', pageWidth / 2, pageHeight - margin * 0.55);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, x, y, maxW, lineH) {
+  let line = '', yy = y;
+  for (let i = 0; i < text.length; i++) {
+    const test = line + text[i];
+    if (ctx.measureText(test).width > maxW && line) {
+      ctx.fillText(line, x, yy);
+      line = text[i];
+      yy += lineH;
+    } else line = test;
+  }
+  if (line) ctx.fillText(line, x, yy);
+}
+
+/* ───── 規則頁 ───── */
+function drawRulesPage(ctx, pageWidth, pageHeight, opts) {
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, pageWidth, pageHeight);
+
+  const accentBar = opts.symbol === 'icon' ? '#FBE6D6' : '#DEE6F7';
+  const accentText = opts.symbol === 'icon' ? '#8F451E' : '#25396B';
+
+  const m = pageWidth * 0.08;
+  let y = m;
+
+  ctx.fillStyle = accentBar;
+  ctx.fillRect(m, y, pageWidth - m * 2, pageWidth * 0.005);
+  y += pageWidth * 0.015;
+
+  ctx.fillStyle = accentText;
+  ctx.font = `900 ${pageWidth * 0.05}px "Noto Serif TC", serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('🧩 團體數獨 搶答競賽 🔢', pageWidth / 2, y);
+  y += pageWidth * 0.07;
+
+  ctx.fillStyle = '#5A6478';
+  ctx.font = `500 ${pageWidth * 0.018}px "Noto Sans TC", sans-serif`;
+  ctx.fillText('一張大盤面、全組一起動腦，從觀察、推理到搶答，循序漸進的認知訓練。', pageWidth / 2, y);
+  y += pageWidth * 0.04;
+
+  ctx.fillStyle = accentBar;
+  ctx.fillRect(m, y, pageWidth - m * 2, pageWidth * 0.005);
+  y += pageWidth * 0.04;
+
+  const levels = [
+    { title: '第一關　觀察找缺', icon: '👀',
+      desc: '老師指定一行、一列或一宮格，請學員找出「還缺哪些數字／圖案」。先熟悉規則：每行、每列、每宮格內不重複。建議從 4×4 入門。',
+      goal: '訓練重點：視覺掃描、注意力、規則理解' },
+    { title: '第二關　分區合作', icon: '👥',
+      desc: '將盤面依宮格分區（色塊已印好），每位學員或每組負責一個顏色區塊，輪流填寫並互相檢查，共同完成整張數獨。',
+      goal: '訓練重點：分工合作、邏輯推理、社交互動' },
+    { title: '第三關　搶答填格', icon: '🔔',
+      desc: '老師展示題目，宣布開始後，學員舉手搶答指定空格該填什麼。答對得分並由其填入，答錯換人。可計時加壓、累積積分。',
+      goal: '訓練重點：反應速度、邏輯推理、決策、競爭動機' },
+    { title: '第四關　限時挑戰（進階）', icon: '🏆',
+      desc: '分組競賽，各組拿相同題目（9×9 或挑戰難度），限時內完成最多正確格數者勝。完成後交換答案頁互評。',
+      goal: '訓練重點：策略思考、工作記憶、團隊協調、抗壓' },
+  ];
+
+  levels.forEach((lv, idx) => {
+    const cardY = y;
+    const cardH = pageWidth * 0.16;
+    ctx.fillStyle = idx % 2 === 0
+      ? (opts.symbol === 'icon' ? '#FBF4EC' : '#F3F6FC')
+      : (opts.symbol === 'icon' ? '#F0F6F4' : '#F6F3EC');
+    roundRect(ctx, m, cardY, pageWidth - m * 2, cardH, 14);
+    ctx.fill();
+
+    ctx.fillStyle = '#1C2333';
+    ctx.font = `900 ${pageWidth * 0.028}px "Noto Serif TC", serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`${lv.icon}  ${lv.title}`, m + pageWidth * 0.025, cardY + pageWidth * 0.022);
+
+    ctx.fillStyle = '#3A4254';
+    ctx.font = `400 ${pageWidth * 0.018}px "Noto Sans TC", sans-serif`;
+    wrapText(ctx, lv.desc, m + pageWidth * 0.025, cardY + pageWidth * 0.062, pageWidth - m * 2 - pageWidth * 0.05, pageWidth * 0.028);
+
+    ctx.fillStyle = idx % 2 === 0 ? accentText : (opts.symbol === 'icon' ? '#3A6E6E' : '#8A6420');
+    ctx.font = `700 ${pageWidth * 0.015}px "Noto Sans TC", sans-serif`;
+    ctx.fillText(lv.goal, m + pageWidth * 0.025, cardY + cardH - pageWidth * 0.028);
+
+    y += cardH + pageWidth * 0.02;
+  });
+
+  y += pageWidth * 0.005;
+  ctx.fillStyle = '#5A6478';
+  ctx.font = `italic 400 ${pageWidth * 0.015}px "Noto Sans TC", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('盤面大小與難度可依學員程度自由調整，一份題庫玩出多種訓練層次。', pageWidth / 2, y);
+
+  ctx.fillStyle = '#9AA3B8';
+  ctx.font = `400 ${pageWidth * 0.014}px "Noto Sans TC", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('設計者：愛迪樂 鍾孟修 職能治療師', pageWidth / 2, pageHeight - m * 0.5);
+}
+
+/* ════════════════════════════════════════════════════════
+   應用狀態與 UI
+   ════════════════════════════════════════════════════════ */
+const state = {
+  symbol: 'num',       // 'num' | 'icon'
+  iconSet: 'fruit',
+  boardSize: 6,
+  difficulty: 'easy',
+  perPage: 2,
+  numSets: 6,
+  seed: '',
+  showRules: true,
+  showAnswer: true,
+  showCoop: true,
+  generated: null,     // puzzles[]
+  currentPage: 1,
+};
+
+function getRng() {
+  const s = state.seed.trim() ? state.seed : Math.random().toString(36).slice(2, 10);
+  if (!state.seed.trim()) {
+    document.getElementById('seedInput').value = s;
+    state.seed = s;
+  }
+  return mulberry32(strHash(s));
+}
+
+function generate() {
+  const rng = getRng();
+  const puzzles = [];
+  for (let i = 0; i < state.numSets; i++) {
+    puzzles.push(generatePuzzle(state.boardSize, state.difficulty, rng));
+  }
+  state.generated = { puzzles };
+  state.currentPage = 1;
+  renderPreview();
+}
+
+function getPageLayout() {
+  const puzzleCount = state.generated.puzzles.length;
+  const puzPages = Math.ceil(puzzleCount / state.perPage);
+  const pages = [];
+  if (state.showRules) pages.push({ type: 'rules' });
+  for (let i = 0; i < puzPages; i++) pages.push({ type: 'puzzle', startIdx: i * state.perPage });
+  if (state.showAnswer) {
+    const ansPerPage = state.perPage === 1 ? 2 : 4;
+    const ansPages = Math.ceil(puzzleCount / ansPerPage);
+    for (let i = 0; i < ansPages; i++) pages.push({ type: 'answer', startIdx: i * ansPerPage });
+  }
+  return pages;
+}
+
+function buildOpts(extra) {
+  return Object.assign({
+    symbol: state.symbol,
+    iconSet: state.iconSet,
+    showCoop: state.showCoop,
+    title: `團體數獨・${state.boardSize}×${state.boardSize}　${state.symbol === 'icon' ? '圖案版' : '數字版'}`,
+    subtitle: `難度：${({easy:'簡單',normal:'普通',hard:'困難',challenge:'挑戰'})[state.difficulty]}　共 ${state.numSets} 題`,
+  }, extra || {});
+}
+
+function renderPreview() {
+  const canvas = document.getElementById('previewCanvas');
+  const ctx = canvas.getContext('2d');
+  const DPR = 2;
+  canvas.width = A4.w * DPR;
+  canvas.height = A4.h * DPR;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(DPR, DPR);
+  ctx.fillStyle = '#FFF';
+  ctx.fillRect(0, 0, A4.w, A4.h);
+
+  const pages = getPageLayout();
+  const totalPages = pages.length;
+  if (state.currentPage > totalPages) state.currentPage = totalPages;
+  if (state.currentPage < 1) state.currentPage = 1;
+  const p = pages[state.currentPage - 1];
+  if (!p) return;
+
+  if (p.type === 'rules') {
+    drawRulesPage(ctx, A4.w, A4.h, buildOpts());
+  } else if (p.type === 'puzzle') {
+    drawPuzzlePage(ctx, A4.w, A4.h, state.generated.puzzles, p.startIdx, state.perPage,
+      buildOpts({ pageLabel: `第 ${state.currentPage} / ${totalPages} 頁` }));
+  } else if (p.type === 'answer') {
+    drawAnswerPage(ctx, A4.w, A4.h, state.generated.puzzles, p.startIdx, state.perPage, buildOpts());
+  }
+
+  document.getElementById('pgInfo').textContent = `第 ${state.currentPage} / ${totalPages} 頁`;
+  document.getElementById('prevPg').disabled = state.currentPage <= 1;
+  document.getElementById('nextPg').disabled = state.currentPage >= totalPages;
+
+  const puzPages = Math.ceil(state.generated.puzzles.length / state.perPage);
+  document.getElementById('metaInfo').textContent =
+    `${state.boardSize}×${state.boardSize} ・ ${state.numSets} 題 ・ ${puzPages} 題目頁`;
+}
+
+/* ───── PDF 匯出 ───── */
+async function exportPDF() {
+  const btn = document.getElementById('btnPDF');
+  const origText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ 產生中...';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+
+    const W = A4_PRINT.w, H = A4_PRINT.h;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const cx = c.getContext('2d');
+
+    const pages = getPageLayout();
+    let firstPage = true;
+
+    for (let pi = 0; pi < pages.length; pi++) {
+      const p = pages[pi];
+      if (!firstPage) doc.addPage();
+      firstPage = false;
+
+      if (p.type === 'rules') {
+        drawRulesPage(cx, W, H, buildOpts());
+      } else if (p.type === 'puzzle') {
+        drawPuzzlePage(cx, W, H, state.generated.puzzles, p.startIdx, state.perPage,
+          buildOpts({ pageLabel: `第 ${pi + 1} / ${pages.length} 頁` }));
+      } else if (p.type === 'answer') {
+        drawAnswerPage(cx, W, H, state.generated.puzzles, p.startIdx, state.perPage, buildOpts());
+      }
+
+      const img = c.toDataURL('image/jpeg', 0.92);
+      doc.addImage(img, 'JPEG', 0, 0, pageW, pageH, undefined, 'FAST');
+    }
+
+    const fname = `團體數獨_${state.boardSize}x${state.boardSize}_${state.symbol === 'icon' ? '圖案' : '數字'}_${state.seed}.pdf`;
+    doc.save(fname);
+    toast('✓ PDF 已產生');
+  } catch (e) {
+    console.error(e);
+    toast('⚠ 產生失敗：' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origText;
+  }
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ───── UI 綁定 ───── */
+function bindSymbol() {
+  document.getElementById('symNum').addEventListener('click', () => setSymbol('num'));
+  document.getElementById('symIcon').addEventListener('click', () => setSymbol('icon'));
+}
+function setSymbol(m) {
+  state.symbol = m;
+  document.body.dataset.symbol = m;
+  document.getElementById('symNum').setAttribute('aria-pressed', m === 'num');
+  document.getElementById('symIcon').setAttribute('aria-pressed', m === 'icon');
+  document.getElementById('modeBadge').textContent = m === 'num' ? '數 字 模 式' : '圖 案 模 式';
+  document.getElementById('fldIconSet').style.display = m === 'icon' ? '' : 'none';
+  // 圖案模式時，9×9 圖案易過小，提醒但不強制
+  renderPreview();
+}
+
+function bindSeg(id, key, isNumber, action) {
+  const seg = document.getElementById(id);
+  seg.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false'));
+      b.setAttribute('aria-pressed', 'true');
+      state[key] = isNumber ? parseInt(b.dataset.val, 10) : b.dataset.val;
+      if (action === 'regen') generate();
+      else renderPreview();
+    });
+  });
+}
+
+function bindRange(id, key, valId, action) {
+  const r = document.getElementById(id);
+  const v = document.getElementById(valId);
+  let t = null;
+  r.addEventListener('input', () => {
+    state[key] = parseInt(r.value, 10);
+    v.textContent = r.value;
+    clearTimeout(t);
+    t = setTimeout(() => { if (action === 'regen') generate(); else renderPreview(); }, 120);
+  });
+}
+
+function bindToggle(id, key) {
+  const t = document.getElementById(id);
+  const flip = () => {
+    state[key] = !state[key];
+    t.classList.toggle('on', state[key]);
+    t.setAttribute('aria-checked', String(state[key]));
+    renderPreview();
+  };
+  t.addEventListener('click', flip);
+  t.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); }
+  });
+}
+
+function init() {
+  bindSymbol();
+  bindSeg('segBoard', 'boardSize', true, 'regen');
+  bindSeg('segDiff', 'difficulty', false, 'regen');
+  bindSeg('segIconSet', 'iconSet', false, 'render');
+  bindSeg('segPerPage', 'perPage', true, 'render');
+  bindRange('rngSets', 'numSets', 'vSets', 'regen');
+
+  bindToggle('togRules', 'showRules');
+  bindToggle('togAnswer', 'showAnswer');
+  bindToggle('togCoop', 'showCoop');
+
+  document.getElementById('seedInput').addEventListener('change', (e) => {
+    state.seed = e.target.value.trim();
+    generate();
+  });
+  document.getElementById('seedReroll').addEventListener('click', () => {
+    state.seed = '';
+    document.getElementById('seedInput').value = '';
+    const btn = document.getElementById('seedReroll');
+    btn.classList.remove('rolling');
+    void btn.offsetWidth;
+    btn.classList.add('rolling');
+    generate();
+  });
+  document.getElementById('btnReroll').addEventListener('click', () => {
+    state.seed = '';
+    document.getElementById('seedInput').value = '';
+    generate();
+  });
+  document.getElementById('btnPDF').addEventListener('click', exportPDF);
+
+  document.getElementById('prevPg').addEventListener('click', () => { state.currentPage--; renderPreview(); });
+  document.getElementById('nextPg').addEventListener('click', () => { state.currentPage++; renderPreview(); });
+
+  window.addEventListener('orientationchange', () => setTimeout(renderPreview, 200));
+
+  generate();
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
